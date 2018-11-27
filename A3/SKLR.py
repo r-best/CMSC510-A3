@@ -24,9 +24,9 @@ def getK(X, Y):
 
 
 def getL(X):
+    g = lambda i, j, t=1: np.exp(np.negative(np.sum(np.square(X[i]-X[j]))/t))
+
     n = X.shape[0]
-    def g(i, j, t=1):
-        return np.exp(np.negative(np.sum(np.square(X[i]-X[j]))/t))
     A = np.zeros((n, n))
     D = np.zeros((n, n))
     for i, _ in enumerate(X):
@@ -74,7 +74,7 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
 
     l = lambda i: tf.log(1 + tf.exp(
         tf.reduce_sum(
-            tf.multiply(tf.multiply(a, y), tf.reshape(K[i][:m], [-1, 1]))
+            tf.multiply(tf.multiply(a, y), tf.reshape(K[i,:m], [-1, 1]))
         ) + b
     ))
     hell1 = 0.5*tf.matmul(
@@ -82,17 +82,17 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
         tf.matmul(K[:m,:m], a*y)
     )[0][0]
     hell2 = tf.matmul(tf.transpose(a*y),
-        tf.matmul(K,
-            tf.matmul(L,
-                tf.matmul(K,
+        tf.matmul(K[:m,:m],
+            tf.matmul(L[:m,:m],
+                tf.matmul(K[:m,:m],
                     a*y
-    ))))
+    ))))[0][0]
 
     _, loss = tf.while_loop(
         lambda i, s: tf.less(i, m),
         lambda i, s: (
             i+1,
-            s + l(i) + hell1# + hell2
+            s + l(i) + hell1 + hell2
         ),
         [tf.constant(0, name="loss_i"), tf.constant(0, dtype=tf.float64, name="loss_s")],
         return_same_structure=True
