@@ -36,7 +36,7 @@ def getL(X):
     return D - A
 
 
-def train(x_train, y_train, supervised=0.10, epochs=100, delta=0.0001):
+def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
     """Training function, takes in a training set and its labels and uses gradient descent w/
     logistic loss to calculate feature weights and bias for a classifier
 
@@ -77,14 +77,22 @@ def train(x_train, y_train, supervised=0.10, epochs=100, delta=0.0001):
             tf.multiply(tf.multiply(a, y), tf.reshape(K[i][:m], [-1, 1]))
         ) + b
     ))
-    hell1 = 0.5*tf.transpose(a*y)*K*a*y
-    hell2 = tf.transpose(a*y)*K*L*K*a*y
+    hell1 = 0.5*tf.matmul(
+        tf.transpose(a*y),
+        tf.matmul(K[:m,:m], a*y)
+    )[0][0]
+    hell2 = tf.matmul(tf.transpose(a*y),
+        tf.matmul(K,
+            tf.matmul(L,
+                tf.matmul(K,
+                    a*y
+    ))))
 
     _, loss = tf.while_loop(
         lambda i, s: tf.less(i, m),
         lambda i, s: (
             i+1,
-            s + l(i)# + hell1 + hell2
+            s + l(i) + hell1# + hell2
         ),
         [tf.constant(0, name="loss_i"), tf.constant(0, dtype=tf.float64, name="loss_s")],
         return_same_structure=True
@@ -122,10 +130,10 @@ def predict(a, b, K, test):
     """
     labels = list()
     ak = np.multiply(np.multiply(a, np.ones(K.shape[1])), K).T
-    print(ak)
+    # print(ak)
     for row in ak:
         x = np.sum(row)
-        print(x)
+        # print(x)
         if x < 0:
             labels.append(1)
         else:
