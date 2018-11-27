@@ -9,20 +9,21 @@ import tensorflow as tf
 import numpy as np
 import random
 import sys
+from pprint import pprint
 
 from . import utils
 
 
-def getK(x, y):
-    print(x.shape[0])
-    K = np.zeros((x.shape[0], x.shape[0]))
-    for i, x1 in enumerate(x):
-        for j, x2 in enumerate(x):
-            K[i][j] = y[j] * np.exp(np.negative(np.sum(np.square(x1-x2))))
+def getK(X, Y):
+    print(X.shape[0], Y.shape[0])
+    K = np.zeros((X.shape[0], Y.shape[0]))
+    for i, x in enumerate(X):
+        for j, y in enumerate(Y):
+            K[i][j] = np.exp(np.negative(np.sum(np.square(x-y))))
     return np.array(K)
 
 
-def train(x_train, y_train, epochs=100, delta=0.00000001):
+def train(K, y_train, epochs=100, delta=0.0001):
     """Training function, takes in a training set and its labels and uses gradient descent w/
     logistic loss to calculate feature weights and bias for a classifier
 
@@ -46,11 +47,11 @@ def train(x_train, y_train, epochs=100, delta=0.00000001):
         b: float
             The calculated bias after training
     """
-    n_samples, n_features = x_train.shape
+    n_samples = K.shape[0]
 
-    K = tf.constant(getK(x_train, y_train), name="K") # TF CONSTANT
-    
-    a = tf.Variable(np.random.rand(n_features, 1).astype(dtype='float64'), name="w") # Gaussian thing (samplesx1)
+    K = tf.constant(K, name="K") # TF CONSTANT
+
+    a = tf.Variable(np.random.rand(n_samples, 1).astype(dtype='float64'), name="w") # Gaussian thing (samplesx1)
     b = tf.Variable(0.0, dtype=tf.float64, name="b") # Bias offset (scalar)
 
     x = tf.placeholder(dtype=tf.float64, name='x') # Training set (featuresxsamples)
@@ -58,7 +59,7 @@ def train(x_train, y_train, epochs=100, delta=0.00000001):
 
     l = lambda i: tf.log(1 + tf.exp(
         tf.reduce_sum(
-            tf.multiply(a, K[i])
+            tf.multiply(tf.multiply(a, y), tf.reshape(K[i], [-1, 1]))
         ) + b
     ))
     _, hell = tf.while_loop(
@@ -66,7 +67,7 @@ def train(x_train, y_train, epochs=100, delta=0.00000001):
         lambda i, s: (
             i+1,
             s + a[i][0] * tf.reduce_sum(
-                tf.multiply(a, K[i])
+                tf.multiply(a, tf.reshape(K[i], [-1, 1]))
             )
         ),
         [tf.constant(0, name="hell_i"), tf.constant(0, dtype=tf.float64, name="hell_s")],
@@ -89,15 +90,15 @@ def train(x_train, y_train, epochs=100, delta=0.00000001):
         sess.run(tf.global_variables_initializer())
         for i in range(epochs):
             print("Epoch {}".format(i))
-            sess.run([train])
-            print(sess.run([loss, hell]))
+            sess.run([train], feed_dict={y: y_train})
+            print(sess.run(loss, feed_dict={y: y_train}))
             # print(curr_a, curr_b)
         curr_a,curr_b = sess.run([a,b])
 
     return curr_a, curr_b
 
 
-def predict(a, b, test):
+def predict(a, b, K, test):
     """
     Uses given feature weights and bias to classify
     samples in the given test set and yields their labels
@@ -113,13 +114,17 @@ def predict(a, b, test):
     Yields:
         Predicted labels for the samples of the test set
     """
-    for item in test:
-        item = np.atleast_2d(item)
-        u = np.matmul(item,a) + b
-        if u < 0:
-            yield -1
-        elif u > 0:
-            yield 1
+    labels = list()
+    ak = np.multiply(np.multiply(a, np.ones(K.shape[1])), K).T
+    print(ak)
+    for row in ak:
+        x = np.sum(row)
+        print(x)
+        if x < 0:
+            labels.append(1)
+        else:
+            labels.append(-1)
+    return labels
 
 
 def main(argv):
@@ -127,30 +132,37 @@ def main(argv):
     C1 = [5, 6, 7, 8, 9]
 
     # Read args from command line
-    sampleSize = utils.parseArgs(argv)
-    print(sampleSize)
+    sampleSize_train = utils.parseArgs(argv)
+    print(sampleSize_train)
 
     # Load the train and test sets from MNIST
     print("Loading datasets from MNIST...")
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
 
     # Sample training set
-    if sampleSize < 1:
-        sampleIndicies = random.sample(range(len(x_train)), int(len(x_train)*sampleSize))
-        x_train = np.array([_ for i, _ in enumerate(x_train) if i in sampleIndicies])
-        y_train = np.array([_ for i, _ in enumerate(y_train) if i in sampleIndicies])
+    if sampleSize_train < 1:
+        sampleIndicies_train = random.sample(range(len(x_train)), int(len(x_train)*sampleSize_train))
+        x_train = np.array([_ for i, _ in enumerate(x_train) if i in sampleIndicies_train])
+        y_train = np.array([_ for i, _ in enumerate(y_train) if i in sampleIndicies_train])
+
+    sampleSize_test = 0.2
+    sampleIndicies_test = random.sample(range(len(x_test)), int(len(x_test)*sampleSize_test))
+    x_test = np.array([_ for i, _ in enumerate(x_test) if i in sampleIndicies_test])
+    y_test = np.array([_ for i, _ in enumerate(y_test) if i in sampleIndicies_test])
 
     # Apply preprocessing to the training and test sets
     print("Preprocessing training set...")
     x_train, y_train = utils.preprocess(x_train, y_train, C0, C1)
     print("Preprocessing testing set...")
-    # x_test, y_test = utils.preprocess(x_test, y_test, C0, C1)
+    x_test, y_test = utils.preprocess(x_test, y_test, C0, C1)
+
+    K = getK(x_train, x_train)
 
     print("Training model...")
-    a, b = train(x_train, y_train)
+    a, b = train(K, y_train)
 
     print("Evaluating model...")
-    labels = predict(a, b, x_test)
+    labels = predict(a, b, getK(x_train, x_test), x_test)
 
     print("Calculating metrics...")
     utils.evaluate(labels, y_test)
