@@ -60,36 +60,37 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
         b: float
             The calculated bias after training
     """
-    m = int(x_train.shape[0]*supervised)
-    y_train = y_train[:m]
-    print("M: {}".format(m))
+    k = int(x_train.shape[0]*supervised)
+    y_train = y_train[:k]
+    print("# of total samples: {}".format(x_train.shape[0]))
+    print("# of supervised samples: {}".format(k))
 
     K = tf.constant(getK(x_train, x_train), name="K")
     L = tf.constant(getL(x_train), name="L")
 
-    a = tf.Variable(np.random.rand(m, 1).astype(dtype='float64'), name="w") # Gaussian thing (samplesx1)
+    a = tf.Variable(np.random.rand(k, 1).astype(dtype='float64'), name="w") # Gaussian thing (samplesx1)
     b = tf.Variable(0.0, dtype=tf.float64, name="b") # Bias offset (scalar)
 
     y = tf.placeholder(dtype=tf.float64, name='y') # Training set labels (samplesx1)
 
     l = lambda i: tf.log(1 + tf.exp(
         tf.reduce_sum(
-            tf.multiply(tf.multiply(a, y), tf.reshape(K[i,:m], [-1, 1]))
+            tf.multiply(tf.multiply(a, y), tf.reshape(K[i,:k], [-1, 1]))
         ) + b
     ))
     hell1 = 0.5*tf.matmul(
         tf.transpose(a*y),
-        tf.matmul(K[:m,:m], a*y)
+        tf.matmul(K[:k,:k], a*y)
     )[0][0]
     hell2 = tf.matmul(tf.transpose(a*y),
-        tf.matmul(K[:m,:m],
-            tf.matmul(L[:m,:m],
-                tf.matmul(K[:m,:m],
+        tf.matmul(K[:k,:k],
+            tf.matmul(L[:k,:k],
+                tf.matmul(K[:k,:k],
                     a*y
     ))))[0][0]
 
     _, loss = tf.while_loop(
-        lambda i, s: tf.less(i, m),
+        lambda i, s: tf.less(i, k),
         lambda i, s: (
             i+1,
             s + l(i) + hell1 + hell2
