@@ -13,7 +13,16 @@ import sys
 from . import utils
 
 
-def train(x_train, y_train, epochs=100, batch_size=128, a=0.1, prox_const=0.00001):
+def getK(x, y):
+    print(x.shape[0])
+    K = np.zeros((x.shape[0], x.shape[0]))
+    for i, x1 in enumerate(x):
+        for j, x2 in enumerate(x):
+            K[i][j] = y[j] * np.exp(np.negative(np.sum(np.square(x1-x2))))
+    return np.array(K)
+
+
+def train(x_train, y_train, epochs=100, delta=0.00000001):
     """Training function, takes in a training set and its labels and uses gradient descent w/
     logistic loss to calculate feature weights and bias for a classifier
 
@@ -38,50 +47,57 @@ def train(x_train, y_train, epochs=100, batch_size=128, a=0.1, prox_const=0.0000
             The calculated bias after training
     """
     n_samples, n_features = x_train.shape
+
+    K = tf.constant(getK(x_train, y_train), name="K") # TF CONSTANT
     
-    w = tf.Variable(np.random.rand(n_features, 1).astype(dtype='float64'), name="w") # Feature weights (featuresx1)
+    a = tf.Variable(np.random.rand(n_features, 1).astype(dtype='float64'), name="w") # Gaussian thing (samplesx1)
     b = tf.Variable(0.0, dtype=tf.float64, name="b") # Bias offset (scalar)
 
     x = tf.placeholder(dtype=tf.float64, name='x') # Training set (featuresxsamples)
     y = tf.placeholder(dtype=tf.float64, name='y') # Training set labels (samplesx1)
 
-    predictions = tf.matmul(x, w) + b
-    loss = tf.reduce_mean(
-        tf.log(1 + tf.exp(
-            tf.multiply(-1.0*y, predictions)
-        ))
+    l = lambda i: tf.log(1 + tf.exp(
+        tf.reduce_sum(
+            tf.multiply(a, K[i])
+        ) + b
+    ))
+    _, hell = tf.while_loop(
+        lambda i, s: tf.less(i, n_samples),
+        lambda i, s: (
+            i+1,
+            s + a[i][0] * tf.reduce_sum(
+                tf.multiply(a, K[i])
+            )
+        ),
+        [tf.constant(0, name="hell_i"), tf.constant(0, dtype=tf.float64, name="hell_s")],
+        return_same_structure=True
     )
 
-    train = tf.train.GradientDescentOptimizer(a).minimize(loss)
+    _, loss = tf.while_loop(
+        lambda i, s: tf.less(i, n_samples),
+        lambda i, s: (
+            i+1,
+            s + l(i) + hell
+        ),
+        [tf.constant(0, name="loss_i"), tf.constant(0, dtype=tf.float64, name="loss_s")],
+        return_same_structure=True
+    )
+
+    train = tf.train.GradientDescentOptimizer(delta).minimize(loss)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
+        for i in range(epochs):
+            print("Epoch {}".format(i))
+            sess.run([train])
+            print(sess.run([loss, hell]))
+            # print(curr_a, curr_b)
+        curr_a,curr_b = sess.run([a,b])
 
-        for _ in range(epochs):
-            # Train model on batches of training set
-            for i in range(0,n_samples,batch_size):
-                iE = min(n_samples, i+batch_size)
-                x_batch = x_train[i:iE,:]
-                y_batch = y_train[i:iE,:]
-                sess.run([train],feed_dict={x: x_batch, y: y_batch})
-
-            # training done in this epoch, get current values of w and b
-            curr_w,curr_b = sess.run([w,b])
-
-            # Soft thresholding
-            for i in range(len(curr_w)):
-                if curr_w[i][0] < prox_const*-1:
-                    curr_w[i][0] += prox_const
-                elif curr_w[i][0] > prox_const:
-                    curr_w[i][0] -= prox_const
-                else:
-                    curr_w[i][0] = 0
-            sess.run([tf.assign(w, curr_w)])
-
-    return curr_w, curr_b
+    return curr_a, curr_b
 
 
-def predict(w, b, test):
+def predict(a, b, test):
     """
     Uses given feature weights and bias to classify
     samples in the given test set and yields their labels
@@ -99,7 +115,7 @@ def predict(w, b, test):
     """
     for item in test:
         item = np.atleast_2d(item)
-        u = np.matmul(item,w) + b
+        u = np.matmul(item,a) + b
         if u < 0:
             yield -1
         elif u > 0:
@@ -112,27 +128,29 @@ def main(argv):
 
     # Read args from command line
     sampleSize = utils.parseArgs(argv)
+    print(sampleSize)
 
     # Load the train and test sets from MNIST
     print("Loading datasets from MNIST...")
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
 
+    # Sample training set
+    if sampleSize < 1:
+        sampleIndicies = random.sample(range(len(x_train)), int(len(x_train)*sampleSize))
+        x_train = np.array([_ for i, _ in enumerate(x_train) if i in sampleIndicies])
+        y_train = np.array([_ for i, _ in enumerate(y_train) if i in sampleIndicies])
+
     # Apply preprocessing to the training and test sets
     print("Preprocessing training set...")
     x_train, y_train = utils.preprocess(x_train, y_train, C0, C1)
     print("Preprocessing testing set...")
-    x_test, y_test = utils.preprocess(x_test, y_test, C0, C1)
-
-    # Sample training set
-    sampleIndicies = random.sample(range(len(x_train)), int(len(x_train)*sampleSize))
-    x_train_sample = np.array([_ for i, _ in enumerate(x_train) if i in sampleIndicies])
-    y_train_sample = np.array([_ for i, _ in enumerate(y_train) if i in sampleIndicies])
+    # x_test, y_test = utils.preprocess(x_test, y_test, C0, C1)
 
     print("Training model...")
-    w, b = train(x_train_sample, y_train_sample)
+    a, b = train(x_train, y_train)
 
     print("Evaluating model...")
-    labels = predict(w, b, x_test)
+    labels = predict(a, b, x_test)
 
     print("Calculating metrics...")
     utils.evaluate(labels, y_test)

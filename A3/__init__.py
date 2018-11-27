@@ -1,2 +1,1 @@
-from .test import *
-from .utils import *
+from .KLR import train, predict, main
