@@ -1,6 +1,6 @@
 import sys
 
-from A3 import KLR
+from A3 import KLR, SKLR
 
 
-KLR.main(sys.argv)
+SKLR.main(sys.argv)
