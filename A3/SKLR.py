@@ -84,7 +84,7 @@ def train(x_train, y_train, supervised=0.10, epochs=100, delta=0.0001):
         lambda i, s: tf.less(i, m),
         lambda i, s: (
             i+1,
-            s + l(i) + hell1# + hell2
+            s + l(i)# + hell1 + hell2
         ),
         [tf.constant(0, name="loss_i"), tf.constant(0, dtype=tf.float64, name="loss_s")],
         return_same_structure=True
