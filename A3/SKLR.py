@@ -38,7 +38,7 @@ def getL(X):
     return D - A
 
 
-def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.01):
+def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
     """Training function, takes in a training set and its labels and uses gradient descent w/
     logistic loss to calculate feature weights and bias for a classifier
 
@@ -72,7 +72,7 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.01):
     K = tf.constant(getK(x_train, x_train), name="K")
     L = tf.constant(getL(x_train), name="L")
 
-    a = tf.Variable(np.random.rand(m, 1).astype(dtype='float64'), name="c") # Gaussian thing (samplesx1)
+    c = tf.Variable(np.random.rand(m, 1).astype(dtype='float64'), name="c") # Gaussian thing (samplesx1)
     b = tf.Variable(0.0, dtype=tf.float64, name="b") # Bias offset (scalar)
 
     y = tf.placeholder(dtype=tf.float64, name='y', shape=[m, 1]) # Training set labels (samplesx1)
@@ -80,24 +80,24 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.01):
     l = lambda i: tf.log(1 + tf.exp(
         tf.negative(y[i][0]) * (
         tf.reduce_sum(
-            tf.multiply(a*y, tf.reshape(K[i], [-1, 1]))
+            tf.multiply(c, tf.reshape(K[i], [-1, 1]))
         ) + b)
     ))
-    hell1 = 0.5*tf.matmul(
-        tf.transpose(a*y),
-        tf.matmul(K, a*y)
+    term1 = 0.5*tf.matmul(
+        tf.transpose(c),
+        tf.matmul(K, c)
     )[0][0]
-    hell2 = tf.matmul(tf.transpose(a*y),
+    term2 = tf.matmul(tf.transpose(c),
         tf.matmul(K,
             tf.matmul(L,
-                tf.matmul(K, a*y)
+                tf.matmul(K, c)
     )))[0][0]
 
     _, loss = tf.while_loop(
         lambda i, s: tf.less(i, k),
         lambda i, s: (
             i+1,
-            s + l(i) + hell1 + hell2
+            s + l(i) + term1 + term2
         ),
         [tf.constant(0, name="loss_i"), tf.constant(0, dtype=tf.float64, name="loss_s")]
     )
@@ -110,12 +110,12 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.01):
             print("Epoch {}".format(i))
             sess.run([train], feed_dict={y: y_train})
             print(sess.run(loss, feed_dict={y: y_train}))
-        curr_a,curr_b = sess.run([a,b])
+        curr_c,curr_b = sess.run([c,b])
 
-    return curr_a, curr_b
+    return curr_c, curr_b
 
 
-def predict(a, b, K, test):
+def predict(c, b, train, test):
     """
     Uses given feature weights and bias to classify
     samples in the given test set and yields their labels
@@ -131,16 +131,15 @@ def predict(a, b, K, test):
     Yields:
         Predicted labels for the samples of the test set
     """
+    K = getK(train, test)
+    ck = np.multiply(np.multiply(c, np.ones(K.shape[1])), K).T
     labels = list()
-    ak = np.multiply(np.multiply(a, np.ones(K.shape[1])), K).T
-    # print(ak)
-    for row in ak:
-        x = np.sum(row)
-        # print(x)
-        if x < 0:
-            labels.append(1)
-        else:
+    for row in ck:
+        pred = np.sum(row)
+        if pred < 0:
             labels.append(-1)
+        else:
+            labels.append(1)
     return labels
 
 
@@ -186,10 +185,10 @@ def main(argv):
     print("finished {:.3f}s".format(time()-t))
 
     print("Training model...")
-    a, b = train(x_train, y_train, SUPERV_RATE)
+    c, b = train(x_train, y_train, SUPERV_RATE)
 
     print("Evaluating model...")
-    labels = predict(a, b, getK(x_train, x_test), x_test)
+    labels = predict(c, b, x_train, x_test)
 
     print("Calculating metrics...")
     utils.evaluate(labels, y_test)
