@@ -9,15 +9,17 @@ import tensorflow as tf
 import numpy as np
 import random
 import sys
+from time import time
 from pprint import pprint
 
 from . import utils
 
 
 def getK(X, Y):
-    print(X.shape[0], Y.shape[0])
+    print("\tBuilding K ({}x{})".format(X.shape[0], Y.shape[0]))
     K = np.zeros((X.shape[0], Y.shape[0]))
     for i, x in enumerate(X):
+        # print("\t{}/{}".format(i, X.shape[0]))
         for j, y in enumerate(Y):
             K[i][j] = np.exp(np.negative(np.sum(np.square(x-y))))
     return np.array(K)
@@ -108,7 +110,6 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.01):
             print("Epoch {}".format(i))
             sess.run([train], feed_dict={y: y_train})
             print(sess.run(loss, feed_dict={y: y_train}))
-            # print(curr_a, curr_b)
         curr_a,curr_b = sess.run([a,b])
 
     return curr_a, curr_b
@@ -143,38 +144,49 @@ def predict(a, b, K, test):
     return labels
 
 
+def sample(X, Y, sample_size):
+    n_samples = X.shape[0]
+    if n_samples != Y.shape[0]:
+        raise ValueError()
+    if sample_size < 1:
+        sampleIndicies = random.sample(range(n_samples), int(n_samples*sample_size))
+        X = np.array([x for i, x in enumerate(X) if i in sampleIndicies])
+        Y = np.array([y for i, y in enumerate(Y) if i in sampleIndicies])
+    return X, Y
+
+
 def main(argv):
     C0 = [0, 1, 2, 3, 4]
     C1 = [5, 6, 7, 8, 9]
 
     # Read args from command line
-    sampleSize_train = utils.parseArgs(argv)
-    supervised = 0.10
-    print(sampleSize_train)
+    SAMPLE_TRAIN = utils.parseArgs(argv)
+    SAMPLE_TEST = 0.2
+    SUPERV_RATE = 0.10
 
     # Load the train and test sets from MNIST
-    print("Loading datasets from MNIST...")
+    print("Loading datasets from MNIST...", end='', flush=True); t = time()
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
+    print("finished {:.3f}s".format(time()-t))
 
-    # Sample training set
-    if sampleSize_train < 1:
-        sampleIndicies_train = random.sample(range(len(x_train)), int(len(x_train)*sampleSize_train))
-        x_train = np.array([_ for i, _ in enumerate(x_train) if i in sampleIndicies_train])
-        y_train = np.array([_ for i, _ in enumerate(y_train) if i in sampleIndicies_train])
-
-    sampleSize_test = 0.2
-    sampleIndicies_test = random.sample(range(len(x_test)), int(len(x_test)*sampleSize_test))
-    x_test = np.array([_ for i, _ in enumerate(x_test) if i in sampleIndicies_test])
-    y_test = np.array([_ for i, _ in enumerate(y_test) if i in sampleIndicies_test])
+    # Sample datasets
+    print("Sampling training set...", end='', flush=True); t = time()
+    x_train, y_train = sample(x_train, y_train, SAMPLE_TRAIN)
+    print("finished {:.3f}s".format(time()-t))
+    print("Sampling testing set...", end='', flush=True); t = time()
+    x_test, y_test = sample(x_test, y_test, SAMPLE_TEST)
+    print("finished {:.3f}s".format(time()-t))
 
     # Apply preprocessing to the training and test sets
-    print("Preprocessing training set...")
+    print("Preprocessing training set...", end='', flush=True); t = time()
     x_train, y_train = utils.preprocess(x_train, y_train, C0, C1)
-    print("Preprocessing testing set...")
+    print("finished {:.3f}s".format(time()-t))
+    print("Preprocessing testing set...", end='', flush=True); t = time()
     x_test, y_test = utils.preprocess(x_test, y_test, C0, C1)
+    print("finished {:.3f}s".format(time()-t))
 
     print("Training model...")
-    a, b = train(x_train, y_train, supervised)
+    a, b = train(x_train, y_train, SUPERV_RATE)
 
     print("Evaluating model...")
     labels = predict(a, b, getK(x_train, x_test), x_test)

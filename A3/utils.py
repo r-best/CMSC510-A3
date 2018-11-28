@@ -60,7 +60,7 @@ def preprocess(X, Y, C0, C1):
     X = np.reshape(X, (len(X), len(X[0])**2))
 
     # Normalize sample values to be between 0 and 1
-    X = [[x/256 for x in sample] for sample in X]
+    X = np.divide(X, 256)
 
     # Replace the 0-9 class labels with -1 and 1 depending on which group the label is in
     Y = np.fromiter((-1 if y in C0 else 1 for y in Y), int)
