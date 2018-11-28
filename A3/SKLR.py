@@ -36,7 +36,7 @@ def getL(X):
     return D - A
 
 
-def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
+def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.01):
     """Training function, takes in a training set and its labels and uses gradient descent w/
     logistic loss to calculate feature weights and bias for a classifier
 
@@ -60,34 +60,36 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
         b: float
             The calculated bias after training
     """
-    k = int(x_train.shape[0]*supervised)
-    y_train = y_train[:k]
-    print("# of total samples: {}".format(x_train.shape[0]))
+    m = x_train.shape[0]
+    k = int(m*supervised)
+    for i in range(k, m):
+        y_train[i] = 0
+    print("# of total samples: {}".format(m))
     print("# of supervised samples: {}".format(k))
 
     K = tf.constant(getK(x_train, x_train), name="K")
     L = tf.constant(getL(x_train), name="L")
 
-    a = tf.Variable(np.random.rand(k, 1).astype(dtype='float64'), name="w") # Gaussian thing (samplesx1)
+    a = tf.Variable(np.random.rand(m, 1).astype(dtype='float64'), name="c") # Gaussian thing (samplesx1)
     b = tf.Variable(0.0, dtype=tf.float64, name="b") # Bias offset (scalar)
 
-    y = tf.placeholder(dtype=tf.float64, name='y') # Training set labels (samplesx1)
+    y = tf.placeholder(dtype=tf.float64, name='y', shape=[m, 1]) # Training set labels (samplesx1)
 
     l = lambda i: tf.log(1 + tf.exp(
+        tf.negative(y[i][0]) * (
         tf.reduce_sum(
-            tf.multiply(tf.multiply(a, y), tf.reshape(K[i,:k], [-1, 1]))
-        ) + b
+            tf.multiply(a*y, tf.reshape(K[i], [-1, 1]))
+        ) + b)
     ))
     hell1 = 0.5*tf.matmul(
         tf.transpose(a*y),
-        tf.matmul(K[:k,:k], a*y)
+        tf.matmul(K, a*y)
     )[0][0]
     hell2 = tf.matmul(tf.transpose(a*y),
-        tf.matmul(K[:k,:k],
-            tf.matmul(L[:k,:k],
-                tf.matmul(K[:k,:k],
-                    a*y
-    ))))[0][0]
+        tf.matmul(K,
+            tf.matmul(L,
+                tf.matmul(K, a*y)
+    )))[0][0]
 
     _, loss = tf.while_loop(
         lambda i, s: tf.less(i, k),
@@ -95,8 +97,7 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
             i+1,
             s + l(i) + hell1 + hell2
         ),
-        [tf.constant(0, name="loss_i"), tf.constant(0, dtype=tf.float64, name="loss_s")],
-        return_same_structure=True
+        [tf.constant(0, name="loss_i"), tf.constant(0, dtype=tf.float64, name="loss_s")]
     )
 
     train = tf.train.GradientDescentOptimizer(delta).minimize(loss)
@@ -172,15 +173,11 @@ def main(argv):
     print("Preprocessing testing set...")
     x_test, y_test = utils.preprocess(x_test, y_test, C0, C1)
 
-    # z_train = np.array(x_train[int(len(x_train)*supervised):])
-    # x_train = np.array(x_train[:int(len(x_train)*supervised)])
-    # y_train = np.array(x_train[:int(len(y_train)*supervised)])
-
     print("Training model...")
     a, b = train(x_train, y_train, supervised)
 
     print("Evaluating model...")
-    labels = predict(a, b, getK(x_train[:int(x_train.shape[0]*supervised)], x_test), x_test)
+    labels = predict(a, b, getK(x_train, x_test), x_test)
 
     print("Calculating metrics...")
     utils.evaluate(labels, y_test)
