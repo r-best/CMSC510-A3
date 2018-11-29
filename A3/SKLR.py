@@ -34,7 +34,7 @@ def getL(X):
     return D - A
 
 
-def train(x_train, y_train, supervised=0.10, epochs=1000, delta=0.0001):
+def train(x_train, y_train, supervised=0.10, epochs=1000, delta=0.001):
     """Training function, takes in a training set and its labels and uses gradient descent w/
     logistic loss to calculate feature weights and bias for a classifier
 
