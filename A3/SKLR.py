@@ -16,16 +16,18 @@ from . import utils
 
 
 def getK(X, Y):
-    print("\tBuilding K ({}x{})".format(X.shape[0], Y.shape[0]))
+    print("\tBuilding K ({}x{})...".format(X.shape[0], Y.shape[0]), end='', flush=True); t = time()
     K = np.zeros((X.shape[0], Y.shape[0]))
     for i, x in enumerate(X):
         # print("\t{}/{}".format(i, X.shape[0]))
         for j, y in enumerate(Y):
             K[i][j] = np.exp(np.negative(np.sum(np.square(x-y))))
+    print("finished {:.3f}s".format(time()-t))
     return np.array(K)
 
 
 def getL(X):
+    print("\tBuilding L ({}x{})...".format(X.shape[0], X.shape[0]), end='', flush=True); t = time()
     g = lambda i, j, t=1: np.exp(np.negative(np.sum(np.square(X[i]-X[j]))/t))
 
     n = X.shape[0]
@@ -35,10 +37,11 @@ def getL(X):
         D[i][i] = np.sum([g(i, k) for k in range(n)])
         for j, _ in enumerate(X):
             A[i][j] = g(i, j)
+    print("finished {:.3f}s".format(time()-t))
     return D - A
 
 
-def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
+def train(x_train, y_train, supervised=0.10, epochs=1000, delta=0.01):
     """Training function, takes in a training set and its labels and uses gradient descent w/
     logistic loss to calculate feature weights and bias for a classifier
 
@@ -66,8 +69,8 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
     k = int(m*supervised)
     for i in range(k, m):
         y_train[i] = 0
-    print("# of total samples: {}".format(m))
-    print("# of supervised samples: {}".format(k))
+    print("\t# of total samples: {}".format(m))
+    print("\t# of supervised samples: {}".format(k))
 
     K = tf.constant(getK(x_train, x_train), name="K")
     L = tf.constant(getL(x_train), name="L")
@@ -107,9 +110,9 @@ def train(x_train, y_train, supervised=0.10, epochs=500, delta=0.001):
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         for i in range(epochs):
-            print("Epoch {}".format(i))
+            # print("Epoch {}".format(i))
             sess.run([train], feed_dict={y: y_train})
-            print(sess.run(loss, feed_dict={y: y_train}))
+            # print(sess.run(loss, feed_dict={y: y_train}))
         curr_c,curr_b = sess.run([c,b])
 
     return curr_c, curr_b
@@ -146,7 +149,7 @@ def predict(c, b, train, test):
 def sample(X, Y, sample_size):
     n_samples = X.shape[0]
     if n_samples != Y.shape[0]:
-        raise ValueError()
+        raise ValueError("X and Y input sizes did not match")
     if sample_size < 1:
         sampleIndicies = random.sample(range(n_samples), int(n_samples*sample_size))
         X = np.array([x for i, x in enumerate(X) if i in sampleIndicies])
@@ -155,6 +158,8 @@ def sample(X, Y, sample_size):
 
 
 def main(argv):
+    t0 = time()
+
     C0 = [0, 1, 2, 3, 4]
     C1 = [5, 6, 7, 8, 9]
 
@@ -184,14 +189,17 @@ def main(argv):
     x_test, y_test = utils.preprocess(x_test, y_test, C0, C1)
     print("finished {:.3f}s".format(time()-t))
 
-    print("Training model...")
+    print("Training model..."); t = time()
     c, b = train(x_train, y_train, SUPERV_RATE)
+    print("Finished model training in {:.3f}s".format(time()-t))
 
     print("Evaluating model...")
     labels = predict(c, b, x_train, x_test)
+    print("Finished evaluating model in {:.3f}s".format(time()-t))
 
-    print("Calculating metrics...")
+    print("Pipeline finished in {:.3f}s, calculating results...".format(time()-t0))
     utils.evaluate(labels, y_test)
+
 
 if __name__ == '__main__':
     main(sys.argv)
