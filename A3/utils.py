@@ -143,4 +143,6 @@ def evaluate(labels, gold):
     print("Class +1 Precision: {:.3f}".format(precision[1]))
     print("Class +1 Recall: {:.3f}".format(recall[1]))
     print("Class +1 F-Measure: {:.3f}".format(fscore[1]))
-    print("Accuracy: {}/{} = {:.3f}%".format(correct, len(gold), correct/len(gold)*100))
+    acc = correct/len(gold)*100
+    print("Accuracy: {}/{} = {:.3f}%".format(correct, len(gold), acc))
+    return np.array([precision[0], recall[0], fscore[0], precision[1], recall[1], fscore[1], acc])

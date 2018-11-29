@@ -15,7 +15,7 @@ from pprint import pprint
 from . import utils
 
 
-def train(x_train, y_train, epochs=100, delta=0.001):
+def train(x_train, y_train, epochs=100, delta=0.0001):
     """Training function, takes in a training set and its labels and uses gradient descent w/
     logistic loss to calculate feature weights and bias for a classifier
 
@@ -157,7 +157,7 @@ def main(argv):
 
     # Calculate metrics
     print("Pipeline finished in {:.3f}s, calculating results...".format(time()-t0))
-    utils.evaluate(labels, y_test)
+    return utils.evaluate(labels, y_test)
 
 if __name__ == '__main__':
     main(sys.argv)

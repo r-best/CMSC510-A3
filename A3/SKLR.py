@@ -181,7 +181,7 @@ def main(argv):
 
     # Calculate metrics
     print("Pipeline finished in {:.3f}s, calculating results...".format(time()-t0))
-    utils.evaluate(labels, y_test)
+    return utils.evaluate(labels, y_test)
 
 
 if __name__ == '__main__':
