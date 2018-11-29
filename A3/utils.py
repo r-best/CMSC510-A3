@@ -4,8 +4,44 @@ CMSC 510
 Assignment 2
 Due 11/12/18
 """
+import random
 import numpy as np
+from time import time
 from sklearn import metrics
+
+
+def getK(X1, X2):
+    print("\tBuilding K ({}x{})...".format(X1.shape[0], X2.shape[0]), end='', flush=True); t = time()
+    K = np.zeros((X1.shape[0], X2.shape[0]))
+    for i, x in enumerate(X1):
+        # print("\t{}/{}".format(i, X1.shape[0]))
+        for j, y in enumerate(X2):
+            K[i][j] = np.exp(np.negative(np.sum(np.square(x-y))))
+    print("finished {:.3f}s".format(time()-t))
+    return K
+
+
+def sample(X, Y, sample_size):
+    """Takes in a dataset and its labels and returns a
+    random sample of them according to the given sample_size
+
+    Arguments:
+        - X: ndarray (samplesxfeatures)
+        - Y: ndarray (samplesx1)
+        - sample_size: 0<float<=1
+            Percentage of dataset to sample
+    
+    Returns:
+        X and Y sampled according to sample_size
+    """
+    n_samples = X.shape[0]
+    if n_samples != Y.shape[0]:
+        raise ValueError("X and Y input sizes did not match")
+    if sample_size < 1:
+        sampleIndicies = random.sample(range(n_samples), int(n_samples*sample_size))
+        X = np.array([x for i, x in enumerate(X) if i in sampleIndicies])
+        Y = np.array([y for i, y in enumerate(Y) if i in sampleIndicies])
+    return X, Y
 
 
 def parseArgs(argv):

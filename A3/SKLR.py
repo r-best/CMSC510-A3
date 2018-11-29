@@ -15,17 +15,6 @@ from pprint import pprint
 from . import utils
 
 
-def getK(X, Y):
-    print("\tBuilding K ({}x{})...".format(X.shape[0], Y.shape[0]), end='', flush=True); t = time()
-    K = np.zeros((X.shape[0], Y.shape[0]))
-    for i, x in enumerate(X):
-        # print("\t{}/{}".format(i, X.shape[0]))
-        for j, y in enumerate(Y):
-            K[i][j] = np.exp(np.negative(np.sum(np.square(x-y))))
-    print("finished {:.3f}s".format(time()-t))
-    return np.array(K)
-
-
 def getL(X):
     print("\tBuilding L ({}x{})...".format(X.shape[0], X.shape[0]), end='', flush=True); t = time()
     g = lambda i, j, t=1: np.exp(np.negative(np.sum(np.square(X[i]-X[j]))/t))
@@ -52,16 +41,12 @@ def train(x_train, y_train, supervised=0.10, epochs=1000, delta=0.01):
             The labels of the training set
         epochs: int, default 100
             Number of training iterations
-        batch_size: int, default 128
-            Number of samples to process at a time in each epoch
-        a: float, default 0.1
+        delta: float, default 0.01
             Gradient descent change parameter
-        prox_const: float, default 0.00001
-            Threshold value for soft thresholding
     
     Returns
-        w: ndarray (featuresx1)
-            The calculated feature weights after training
+        c: ndarray (featuresx1)
+            The calculated sample weights after training
         b: float
             The calculated bias after training
     """
@@ -72,7 +57,7 @@ def train(x_train, y_train, supervised=0.10, epochs=1000, delta=0.01):
     print("\t# of total samples: {}".format(m))
     print("\t# of supervised samples: {}".format(k))
 
-    K = tf.constant(getK(x_train, x_train), name="K")
+    K = tf.constant(utils.getK(x_train, x_train), name="K")
     L = tf.constant(getL(x_train), name="L")
 
     c = tf.Variable(np.random.rand(m, 1).astype(dtype='float64'), name="c") # Gaussian thing (samplesx1)
@@ -120,41 +105,32 @@ def train(x_train, y_train, supervised=0.10, epochs=1000, delta=0.01):
 
 def predict(c, b, train, test):
     """
-    Uses given feature weights and bias to classify
-    samples in the given test set and yields their labels
+    Uses given c and bias to classify samples
+    in the given test set
 
     Arguments:
-        w: ndarray (featuresx1)
-            Column matrix of feature weights
+        c: ndarray (train_samplesx1)
+            Column matrix of sample weights
         b: float
             Y-offset value of classifier line
-        test: ndarray (samplesxfeatures)
+        train: ndarray (train_samplesxfeatures)
+            Training set 
+        test: ndarray (test_samplesxfeatures)
             Test set
     
-    Yields:
+    Returns:
         Predicted labels for the samples of the test set
     """
-    K = getK(train, test)
+    K = utils.getK(train, test)
     ck = np.multiply(np.multiply(c, np.ones(K.shape[1])), K).T
     labels = list()
     for row in ck:
-        pred = np.sum(row)
+        pred = np.average(row)
         if pred < 0:
             labels.append(-1)
         else:
             labels.append(1)
     return labels
-
-
-def sample(X, Y, sample_size):
-    n_samples = X.shape[0]
-    if n_samples != Y.shape[0]:
-        raise ValueError("X and Y input sizes did not match")
-    if sample_size < 1:
-        sampleIndicies = random.sample(range(n_samples), int(n_samples*sample_size))
-        X = np.array([x for i, x in enumerate(X) if i in sampleIndicies])
-        Y = np.array([y for i, y in enumerate(Y) if i in sampleIndicies])
-    return X, Y
 
 
 def main(argv):
@@ -163,7 +139,7 @@ def main(argv):
     C0 = [0, 1, 2, 3, 4]
     C1 = [5, 6, 7, 8, 9]
 
-    # Read args from command line
+    # Read args from command line/establish constants
     SAMPLE_TRAIN = utils.parseArgs(argv)
     SAMPLE_TEST = 0.2
     SUPERV_RATE = 0.10
@@ -175,10 +151,10 @@ def main(argv):
 
     # Sample datasets
     print("Sampling training set...", end='', flush=True); t = time()
-    x_train, y_train = sample(x_train, y_train, SAMPLE_TRAIN)
+    x_train, y_train = utils.sample(x_train, y_train, SAMPLE_TRAIN)
     print("finished {:.3f}s".format(time()-t))
     print("Sampling testing set...", end='', flush=True); t = time()
-    x_test, y_test = sample(x_test, y_test, SAMPLE_TEST)
+    x_test, y_test = utils.sample(x_test, y_test, SAMPLE_TEST)
     print("finished {:.3f}s".format(time()-t))
 
     # Apply preprocessing to the training and test sets
@@ -189,14 +165,17 @@ def main(argv):
     x_test, y_test = utils.preprocess(x_test, y_test, C0, C1)
     print("finished {:.3f}s".format(time()-t))
 
+    # Train model
     print("Training model..."); t = time()
     c, b = train(x_train, y_train, SUPERV_RATE)
     print("Finished model training in {:.3f}s".format(time()-t))
 
+    # Evaluate model on test set
     print("Evaluating model...")
-    labels = predict(c, b, x_train, x_test)
+    labels = predict(c, b, x_train, x_test); t = time()
     print("Finished evaluating model in {:.3f}s".format(time()-t))
 
+    # Calculate metrics
     print("Pipeline finished in {:.3f}s, calculating results...".format(time()-t0))
     utils.evaluate(labels, y_test)
 
