@@ -12,9 +12,11 @@ from sklearn import metrics
 
 def getK(X1, X2):
     print("\tBuilding K ({}x{})...".format(X1.shape[0], X2.shape[0]), end='', flush=True); t = time()
+    checkpoints = np.multiply(range(1, 11), X1.shape[0]/10)
     K = np.zeros((X1.shape[0], X2.shape[0]))
     for i, x in enumerate(X1):
-        # print("\t{}/{}".format(i, X1.shape[0]))
+        if i in checkpoints: # Print progress
+            print("{}%...".format((np.where(checkpoints==i)[0][0]+1)*10), end='', flush=True)
         for j, y in enumerate(X2):
             K[i][j] = np.exp(np.negative(np.sum(np.square(x-y))))
     print("finished {:.3f}s".format(time()-t))

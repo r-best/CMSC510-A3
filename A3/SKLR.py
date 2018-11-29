@@ -20,9 +20,13 @@ def getL(X):
     g = lambda i, j, t=1: np.exp(np.negative(np.sum(np.square(X[i]-X[j]))/t))
 
     n = X.shape[0]
+    checkpoints = np.multiply(range(1, 11), n/10)
+
     A = np.zeros((n, n))
     D = np.zeros((n, n))
     for i, _ in enumerate(X):
+        if i in checkpoints: # Print progress
+            print("{}%...".format((np.where(checkpoints==i)[0][0]+1)*10), end='', flush=True)
         D[i][i] = np.sum([g(i, k) for k in range(n)])
         for j, _ in enumerate(X):
             A[i][j] = g(i, j)
@@ -30,7 +34,7 @@ def getL(X):
     return D - A
 
 
-def train(x_train, y_train, supervised=0.10, epochs=1000, delta=0.01):
+def train(x_train, y_train, supervised=0.10, epochs=1000, delta=0.0001):
     """Training function, takes in a training set and its labels and uses gradient descent w/
     logistic loss to calculate feature weights and bias for a classifier
 
