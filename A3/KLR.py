@@ -44,11 +44,13 @@ def train(x_train, y_train, epochs=100, delta=0.0001):
 
     y = tf.placeholder(dtype=tf.float64, name='y') # Training set labels (samplesx1)
 
+    # The first part of the formula
     l = lambda i: tf.log(1 + tf.exp(
         tf.reduce_sum(
             tf.multiply(tf.multiply(a, y), tf.reshape(K[i], [-1, 1]))
         ) + b
     ))
+    # The second part of the formula
     _, term = tf.while_loop(
         lambda i, s: tf.less(i, n_samples),
         lambda i, s: (
@@ -61,6 +63,7 @@ def train(x_train, y_train, epochs=100, delta=0.0001):
         return_same_structure=True
     )
 
+    # Generate the summation of l + term over all i
     _, loss = tf.while_loop(
         lambda i, s: tf.less(i, n_samples),
         lambda i, s: (
@@ -78,7 +81,7 @@ def train(x_train, y_train, epochs=100, delta=0.0001):
         for i in range(epochs):
             # print("Epoch {}".format(i))
             sess.run([train], feed_dict={y: y_train})
-            print(sess.run(loss, feed_dict={y: y_train}))
+            # print(sess.run(loss, feed_dict={y: y_train}))
         curr_a,curr_b = sess.run([a,b])
 
     return curr_a, curr_b

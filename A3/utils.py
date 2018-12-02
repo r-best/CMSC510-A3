@@ -12,6 +12,8 @@ from sklearn import metrics
 
 
 def getK(X1, X2):
+    """Takes in two numpy matrices and calculates K from them in parallel
+    """
     print("\tBuilding K ({}x{})...".format(X1.shape[0], X2.shape[0]), end='', flush=True); t = time()
     checkpoints = np.multiply(range(1, 11), X1.shape[0]/10)
     K = np.zeros((X1.shape[0], X2.shape[0]))
@@ -20,12 +22,22 @@ def getK(X1, X2):
             if i in checkpoints: # Print progress
                 print("{}%...".format((np.where(checkpoints==i)[0][0]+1)*10), end='', flush=True)
             K[i] = np.array(pool.map(_f, [(x, y) for _,y in enumerate(X2)]))
-
     print("finished {:.3f}s".format(time()-t))
     return K
 def _f(tup):
-    x, y = tup
-    return np.exp(np.negative(np.sum(np.square(x-y))))
+    """Helper function used in parallel calculation of K;
+    calculates a single element of K given the rows of X1
+    and X2 needed to do it.
+
+    Arguments:
+        tup: tuple size 2
+            - Contains two elements; first is a row of X1 and
+              second is a row of X2
+    
+    Returns:
+        A single element of K
+    """
+    return np.exp(np.negative(np.sum(np.square(tup[0]-tup[1]))))
 
 
 def sample(X, Y, sample_size):

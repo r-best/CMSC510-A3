@@ -69,16 +69,19 @@ def train(x_train, y_train, supervised=0.10, epochs=1000, delta=0.001):
 
     y = tf.placeholder(dtype=tf.float64, name='y', shape=[m, 1]) # Training set labels (samplesx1)
 
+    # First part of formula
     l = lambda i: tf.log(1 + tf.exp(
         tf.negative(y[i][0]) * (
         tf.reduce_sum(
             tf.multiply(c, tf.reshape(K[i], [-1, 1]))
         ) + b)
     ))
+    # Second part of formula
     term1 = 0.5*tf.matmul(
         tf.transpose(c),
         tf.matmul(K, c)
     )[0][0]
+    # Third part of formula
     term2 = tf.matmul(tf.transpose(c),
         tf.matmul(K,
             tf.matmul(L,
@@ -175,8 +178,8 @@ def main(argv):
     print("Finished model training in {:.3f}s".format(time()-t))
 
     # Evaluate model on test set
-    print("Evaluating model...")
-    labels = predict(c, b, x_train, x_test); t = time()
+    print("Evaluating model..."); t = time()
+    labels = predict(c, b, x_train, x_test)
     print("Finished evaluating model in {:.3f}s".format(time()-t))
 
     # Calculate metrics
