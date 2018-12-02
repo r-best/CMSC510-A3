@@ -42,7 +42,7 @@ def train(x_train, y_train, epochs=100, delta=0.0001):
     a = tf.Variable(np.random.rand(n_samples, 1).astype(dtype='float64'), name="w") # Gaussian thing (samplesx1)
     b = tf.Variable(0.0, dtype=tf.float64, name="b") # Bias offset (scalar)
 
-    y = tf.placeholder(dtype=tf.float64, name='y') # Training set labels (samplesx1)
+    y = tf.placeholder(dtype=tf.float64, name='y', shape=[n_samples, 1]) # Training set labels (samplesx1)
 
     # The first part of the formula
     l = lambda i: tf.log(1 + tf.exp(
@@ -50,20 +50,17 @@ def train(x_train, y_train, epochs=100, delta=0.0001):
             tf.multiply(tf.multiply(a, y), tf.reshape(K[i], [-1, 1]))
         ) + b
     ))
-    # The second part of the formula
-    _, term = tf.while_loop(
-        lambda i, s: tf.less(i, n_samples),
-        lambda i, s: (
-            i+1,
-            s + a[i][0] * tf.reduce_sum(
-                tf.multiply(a, tf.reshape(K[i], [-1, 1]))
-            )
-        ),
-        [tf.constant(0, name="hell_i"), tf.constant(0, dtype=tf.float64, name="hell_s")],
-        return_same_structure=True
-    )
+    # The second part of the formula, managed to reduce the double summation
+    # down to an equation with a bunch of element-wise multiplication
+    term = tf.reduce_sum(tf.multiply(
+        tf.multiply(a, y),
+        tf.multiply(
+            tf.multiply(a, np.ones((1, a.shape[0]))),
+            tf.multiply(tf.multiply(y, np.ones((1, y.shape[0]))), K)
+        )
+    ))
 
-    # Generate the summation of l + term over all i
+    # Generate the summation of l+term over all i
     _, loss = tf.while_loop(
         lambda i, s: tf.less(i, n_samples),
         lambda i, s: (
