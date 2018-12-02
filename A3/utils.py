@@ -6,26 +6,26 @@ Due 11/12/18
 """
 import random
 import numpy as np
+import multiprocessing
 from time import time
 from sklearn import metrics
-from multiprocessing.pool import Pool
 
-def _f(tup):
-    x, y = tup
-    return np.exp(np.negative(np.sum(np.square(x-y))))
 
 def getK(X1, X2):
     print("\tBuilding K ({}x{})...".format(X1.shape[0], X2.shape[0]), end='', flush=True); t = time()
-    p = Pool(processes=6)
     checkpoints = np.multiply(range(1, 11), X1.shape[0]/10)
     K = np.zeros((X1.shape[0], X2.shape[0]))
-    for i, x in enumerate(X1):
-        if i in checkpoints: # Print progress
-            print("{}%...".format((np.where(checkpoints==i)[0][0]+1)*10), end='', flush=True)
-        K[i] = np.array(p.map(_f, [(x, y) for _,y in enumerate(X2)]))
+    with multiprocessing.pool.Pool(processes=6) as pool:
+        for i, x in enumerate(X1):
+            if i in checkpoints: # Print progress
+                print("{}%...".format((np.where(checkpoints==i)[0][0]+1)*10), end='', flush=True)
+            K[i] = np.array(pool.map(_f, [(x, y) for _,y in enumerate(X2)]))
 
     print("finished {:.3f}s".format(time()-t))
     return K
+def _f(tup):
+    x, y = tup
+    return np.exp(np.negative(np.sum(np.square(x-y))))
 
 
 def sample(X, Y, sample_size):
